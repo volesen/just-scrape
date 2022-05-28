@@ -1,0 +1,1 @@
+curl -H 'platform: android' -H 'appname: just-eat.dk' -H 'appversion: 8.0.2' -H 'systemversion: 28;8.0.2' --compressed -H 'user-agent: okhttp/3.14.7' https://dk-cdn.citymeal.com/ws/6.0.8/getrestaurantdata/3OQQPO7N/en
