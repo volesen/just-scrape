@@ -60,7 +60,7 @@ if __name__ == "__main__":
 
     # Step 2: Fetch all restaurant menus and insert into db
 
-    with sqlite3.connect("restaurants.db") as conn:
+    with sqlite3.connect("data/restaurants.db") as conn:
         cursor = conn.cursor()
 
         # Create tables from "models.sql" file
