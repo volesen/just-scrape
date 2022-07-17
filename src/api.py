@@ -1,5 +1,6 @@
 import hashlib
 import requests
+from typing import Tuple
 
 LANG = "da"  # or "en"
 DELIVERY_AREA_ID = ""  # Not quite sure what this is. Reversed engineered from the app.
@@ -8,16 +9,13 @@ IS_ADDRESS_ACCURATE = "1"  # Either 0 or 1
 PASSWORD = "4ndro1d"  # Used in hash
 
 
-def get_retaurants(lat: float, lng: float) -> str:
+def get_retaurants(coord: Tuple[float, float]) -> str:
     """
     Get the list of restaurants for a given coordinate.
     """
+    lng, lat = coord
 
-    lat_str = f"{lat:.7f}"
-    lng_str = f"{lng:.7f}"
-
-    to_hash = f"getrestaurants{DELIVERY_AREA_ID}{COUNTRY_CODE}{lat_str}{lng_str}{LANG}0{IS_ADDRESS_ACCURATE}{PASSWORD}"
-
+    to_hash = f"getrestaurants{DELIVERY_AREA_ID}{COUNTRY_CODE}{lat:.7f}{lng:.7f}{LANG}0{IS_ADDRESS_ACCURATE}{PASSWORD}"
     hash = hashlib.md5(to_hash.encode()).hexdigest()
 
     headers = {
@@ -30,8 +28,8 @@ def get_retaurants(lat: float, lng: float) -> str:
         "var1": "getrestaurants",
         "var2": DELIVERY_AREA_ID,
         "var3": COUNTRY_CODE,
-        "var4": lat_str,
-        "var5": lng_str,
+        "var4": f"{lat:.7f}",
+        "var5": f"{lng:.7f}",
         "var6": LANG,
         "var7": "0",  # Always zero for getrestaurants
         "var8": IS_ADDRESS_ACCURATE,

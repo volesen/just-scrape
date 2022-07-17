@@ -1,9 +1,10 @@
 import json
 import sqlite3
+import xml.etree.ElementTree as ET
 
 from typing import List, Set, Tuple
-from concurrent.futures import ThreadPoolExecutor
-import xml.etree.ElementTree as ET
+from tqdm import tqdm
+from tqdm.contrib.concurrent import thread_map
 
 import api
 import models
@@ -12,15 +13,14 @@ import models
 def scrape_all_restaurant_ids(coords: List[Tuple[float, float]]) -> Set[str]:
     # Fetch restaurant ids for all postal codes
     def scrape_restaurant_ids(coord):
-        response = api.get_retaurants(*coord)
+        response = api.get_retaurants(coord)
         tree = ET.fromstring(response)
-
         return [id.text for id in tree.findall("./rt/id")]
 
-    with ThreadPoolExecutor() as executor:
-        results = executor.map(scrape_restaurant_ids, coords)
+    results = thread_map(scrape_restaurant_ids, coords)
 
     # Some restaurants belong to multiple postal codes
+    # Get unique restaurant ids
     restaurant_ids = set()
     for ids in results:
         restaurant_ids.update(ids)
@@ -28,9 +28,7 @@ def scrape_all_restaurant_ids(coords: List[Tuple[float, float]]) -> Set[str]:
     return restaurant_ids
 
 
-def scrape_all_restaurant_menus(
-    cursor, restaurant_ids: Set[str]
-) -> List[models.Restaurant]:
+def scrape_all_restaurant_menus(restaurant_ids: Set[str]) -> List[models.Restaurant]:
     def scrape_restaurant_menu(restaurant_id):
         try:
             response = api.get_menu(restaurant_id)
@@ -40,34 +38,32 @@ def scrape_all_restaurant_menus(
         except Exception:
             return None
 
-    with ThreadPoolExecutor() as executor:
-        results = executor.map(scrape_restaurant_menu, restaurant_ids)
-        for result in results:
-            if result is not None:
-                result.insert_into_db(cursor)
+    restaurants = thread_map(scrape_restaurant_menu, restaurant_ids)
+    return [r for r in restaurants if r]
 
 
 if __name__ == "__main__":
-    # Step 1: Fetch all restaurant ids
     with open("src/assets/postal_codes.json") as f:
         postal_codes = json.load(f)
 
-    coordinates = [
-        reversed(postal_code["visueltcenter"]) for postal_code in postal_codes
-    ]
+    coordinates = [postal_code["visueltcenter"] for postal_code in postal_codes]
 
+    tqdm.write("Scraping restaurant ids...")
     restaurant_ids = scrape_all_restaurant_ids(coordinates)
 
-    # Step 2: Fetch all restaurant menus and insert into db
+    tqdm.write("Scraping restaurant menus...")
+    restaurants = scrape_all_restaurant_menus(restaurant_ids)
 
-    with sqlite3.connect("data/restaurants.db") as conn:
-        cursor = conn.cursor()
+    tqdm.write("Writing to database...")
 
-        # Create tables from "models.sql" file
-        with open("src/ddl/tables.sql") as f:
-            cursor.executescript(f.read())
+    conn = sqlite3.connect("data/restaurants.db")
 
-        scrape_all_restaurant_menus(cursor, restaurant_ids)
+    # Load table definitions
+    with open("src/ddl/tables.sql") as f:
+        conn.executescript(f.read())
 
-        cursor.close()
-        conn.commit()
+    with conn.cursor() as cursor:
+        for restaurant in restaurants:
+            restaurant.insert_into_db(cursor)
+
+    conn.commit()
