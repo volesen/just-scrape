@@ -62,8 +62,8 @@ if __name__ == "__main__":
     with open("src/ddl/tables.sql") as f:
         conn.executescript(f.read())
 
-    with conn.cursor() as cursor:
-        for restaurant in restaurants:
-            restaurant.insert_into_db(cursor)
+    # Insert restaurants
+    for restaurant in restaurants:
+        restaurant.insert_into_db(conn.cursor())
 
     conn.commit()
